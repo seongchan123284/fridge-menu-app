@@ -483,7 +483,111 @@ div[data-testid="stTabs"] button[aria-selected="true"] { background:#e5efdf; col
 [data-testid="stMetric"] { background:white; border:1px solid #e5ebdf; padding:16px 18px; border-radius:16px; }
 [data-testid="stVerticalBlockBorderWrapper"] { border-radius:16px; border-color:#e3eadf; background:white; }
 [data-testid="stFileUploader"] { background:white; border:1px dashed #b9cbb3; border-radius:16px; padding:12px; }
-small, .stCaption { color:#75816f; }
+small, .stCaption { color:#53634e !important; }
+
+/* 가독성 보강: Streamlit 테마에 관계없이 본문 글씨를 명확하게 표시 */
+[data-testid="stAppViewContainer"] .stMarkdown,
+[data-testid="stAppViewContainer"] .stMarkdown p,
+[data-testid="stAppViewContainer"] .stMarkdown li,
+[data-testid="stAppViewContainer"] label,
+[data-testid="stAppViewContainer"] [data-testid="stCaptionContainer"],
+[data-testid="stAppViewContainer"] [data-testid="stMetricLabel"],
+[data-testid="stAppViewContainer"] [data-testid="stMetricValue"],
+[data-testid="stAppViewContainer"] [data-testid="stMetricDelta"],
+[data-testid="stAppViewContainer"] [data-testid="stExpander"] summary,
+[data-testid="stAppViewContainer"] [data-testid="stAlert"] p {
+    color: #243329 !important;
+    opacity: 1 !important;
+}
+[data-testid="stAppViewContainer"] h1,
+[data-testid="stAppViewContainer"] h2,
+[data-testid="stAppViewContainer"] h3,
+[data-testid="stAppViewContainer"] h4 {
+    color: #193b28 !important;
+    opacity: 1 !important;
+}
+[data-testid="stAppViewContainer"] [data-testid="stMetric"] {
+    background: #ffffff !important;
+    border: 1px solid #d7e2d2 !important;
+}
+[data-testid="stAppViewContainer"] [data-testid="stMetricValue"] div {
+    color: #193b28 !important;
+}
+[data-testid="stAppViewContainer"] [data-testid="stVerticalBlockBorderWrapper"] {
+    background: #ffffff !important;
+    border: 1px solid #d7e2d2 !important;
+}
+[data-testid="stAppViewContainer"] .stButton > button,
+[data-testid="stAppViewContainer"] .stFormSubmitButton > button {
+    color: #ffffff !important;
+    background: #285b3a !important;
+    min-height: 44px;
+    font-size: 1rem;
+}
+[data-testid="stAppViewContainer"] input,
+[data-testid="stAppViewContainer"] textarea,
+[data-testid="stAppViewContainer"] [data-baseweb="select"] * {
+    color: #243329 !important;
+}
+[data-testid="stAppViewContainer"] input::placeholder,
+[data-testid="stAppViewContainer"] textarea::placeholder {
+    color: #667568 !important;
+    opacity: 1 !important;
+}
+
+/* 모바일 화면 최적화 */
+@media (max-width: 768px) {
+    .block-container {
+        padding: 1rem .85rem 2rem .85rem !important;
+        max-width: 100% !important;
+    }
+    .hero {
+        padding: 21px 18px !important;
+        border-radius: 17px !important;
+        margin-bottom: 17px !important;
+    }
+    .hero h1 {
+        font-size: 1.55rem !important;
+        line-height: 1.35 !important;
+    }
+    .hero p {
+        font-size: .95rem !important;
+        line-height: 1.55 !important;
+    }
+    .hero-kicker { font-size: .76rem !important; }
+    .section-title { font-size: 1.2rem !important; }
+    div[data-testid="stTabs"] { width: 100% !important; }
+    div[data-testid="stTabs"] button {
+        padding: 10px 8px !important;
+        font-size: .92rem !important;
+        white-space: nowrap !important;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        padding: .85rem !important;
+        border-radius: 14px !important;
+    }
+    [data-testid="stMetric"] {
+        padding: 12px !important;
+        border-radius: 13px !important;
+    }
+    [data-testid="stMetricLabel"] { font-size: .85rem !important; }
+    [data-testid="stMetricValue"] { font-size: 1.65rem !important; }
+    .stMarkdown p, .stMarkdown li, [data-testid="stCaptionContainer"] {
+        font-size: .95rem !important;
+        line-height: 1.55 !important;
+    }
+    .stButton > button, .stFormSubmitButton > button {
+        width: 100% !important;
+        min-height: 46px !important;
+        font-size: .98rem !important;
+    }
+    [data-testid="stExpander"] summary {
+        font-size: .98rem !important;
+        font-weight: 700 !important;
+        padding: .65rem .25rem !important;
+    }
+    [data-testid="stSidebar"] { min-width: 0 !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
