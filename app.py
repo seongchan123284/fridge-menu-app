@@ -433,6 +433,82 @@ def recipe_score(recipe, available):
     return score, matched, missing
 
 
+
+
+def ingredient_amount(name, recipe_name=""):
+    """1~2인분 기준의 초보자용 대략 계량. 냉장고 보유량과 무관한 조리 기준량입니다."""
+    n = normalize_name(name)
+    recipe = recipe_name
+    # 국물 요리는 메뉴에 따라 물의 양을 다르게 안내합니다.
+    if n == "물":
+        if "찌개" in recipe:
+            return "500ml"
+        if "국" in recipe:
+            return "500ml"
+        if "죽" in recipe:
+            return "450~500ml"
+        if "파스타" in recipe:
+            return "면이 잠길 정도(약 1L, 삶는 물) 또는 레시피 단계 참고"
+        if "조림" in recipe:
+            return "100ml"
+        if "만두" in recipe:
+            return "450ml"
+        if "카레" in recipe:
+            return "250ml"
+        return "2~3큰술(30~45ml), 농도에 따라 조절"
+    amounts = {
+        "계란":"2개", "두부":"150g", "양파":"1/4개(약 50g)", "파":"1/3대(약 20g)",
+        "김치":"150~200g", "삼겹살":"150g", "돼지고기":"150g", "닭가슴살":"150g",
+        "닭고기":"150g", "참치":"작은 캔 1/2개(약 75g)", "파스타면":"100g",
+        "밥":"1공기(약 200g)", "감자":"1개(약 150g)", "토마토":"1개(약 150g)",
+        "마늘":"2쪽", "숙주":"100g", "햄":"50g", "소시지":"5~6개(약 80g)",
+        "만두":"5~6개", "베이컨":"2줄(약 40g)", "콩나물":"100g", "양배추":"100g",
+        "오이":"1/2개", "버섯":"80g", "애호박":"1/3개", "당근":"1/4개",
+        "브로콜리":"80g", "옥수수":"80g", "치즈":"1~2장(약 20~40g)",
+        "식빵":"2장", "우유":"150ml", "어묵":"1장(약 50g)", "떡":"150g",
+        "시금치":"80g", "파프리카":"1/2개", "라면":"1봉지",
+    }
+    return amounts.get(n, "약 1/2컵 또는 1~2큰술(재료 상태에 맞게 조절)")
+
+
+def extra_amount(name, recipe_name=""):
+    n = name.replace("(선택)", "").strip()
+    if "간장" in n: return "1큰술(15ml)"
+    if "국간장" in n: return "1/2~1큰술(7.5~15ml)"
+    if "고춧가루" in n: return "1큰술(약 6g)"
+    if "고추장" in n: return "1큰술(약 20g)"
+    if "다진 마늘" in n or n == "마늘": return "1/2큰술(약 5g)"
+    if "설탕" in n or "올리고당" in n: return "1작은술(약 5g)"
+    if "식용유" in n or "올리브유" in n: return "1큰술(15ml)"
+    if "참기름" in n: return "1작은술(5ml)"
+    if "마요네즈" in n: return "1큰술(15g)"
+    if "토마토소스" in n: return "150g"
+    if "우유" in n: return "150ml"
+    if "밀가루" in n: return "1/2컵(약 60g)"
+    if "소금" in n: return "두 꼬집(약 1g), 마지막에 간 조절"
+    if "후추" in n: return "약간"
+    if "물" in n: return ingredient_amount("물", recipe_name)
+    if "밥" in n: return "1공기(약 200g)"
+    return "약간(선택 재료)"
+
+
+def recipe_water_note(recipe):
+    name = recipe["name"]
+    if "찌개" in name:
+        return "국물은 물 500ml부터 넣으세요. 끓인 뒤 짜면 물 50ml를 추가하고, 싱거우면 국간장 1작은술씩 보충하세요."
+    if "국" in name:
+        return "국물은 물 500ml 기준입니다. 재료가 잠기지 않으면 50ml씩 추가하세요."
+    if "파스타" in name:
+        return "면 삶는 물은 약 1L에 소금 1작은술을 사용하고, 면수는 50~100ml 남겨 소스 농도 조절에 사용하세요."
+    if "조림" in name:
+        return "조림 물은 100ml부터 넣고, 바닥이 마르면 2큰술씩 추가하세요."
+    if "카레" in name:
+        return "물 250ml부터 넣고 카레가루를 풀어 농도를 확인하세요. 너무 되직하면 50ml씩 추가하세요."
+    if "죽" in name:
+        return "물 450~500ml 기준입니다. 끓이는 동안 되직해지면 50ml씩 추가하세요."
+    return None
+
+
 def cooking_guide(recipe, step, index):
     """각 조리 단계에 초보자용 불 세기와 대략적인 시간을 붙입니다."""
     name = recipe["name"]
@@ -502,120 +578,291 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-items = load_data()
-tab1, tab2 = st.tabs(["식재료 관리", "메뉴 추천"])
+def get_gemini_api_key():
+    """Streamlit secrets 또는 환경변수에서 Gemini API 키를 안전하게 읽습니다."""
+    try:
+        key = st.secrets.get("GEMINI_API_KEY", "")
+    except Exception:
+        key = ""
+    return key or os.getenv("GEMINI_API_KEY", "")
 
-with tab1:
-    st.markdown("<div class='section-title'>식재료 관리</div>", unsafe_allow_html=True)
-    st.caption("보유한 재료와 유통기한을 한눈에 관리해요.")
-    with st.form("add_ingredient", clear_on_submit=True):
-        c1, c2, c3 = st.columns([2, 1, 1])
-        with c1:
-            new_name = st.text_input("식재료 이름", placeholder="예: 계란")
-        with c2:
-            quantity = st.text_input("수량", placeholder="예: 3개")
-        with c3:
-            expiry = st.date_input("유통기한", value=date.today() + timedelta(days=7))
-        submitted = st.form_submit_button("재료 추가")
-        if submitted:
-            if not new_name.strip():
-                st.warning("식재료 이름을 입력해 주세요.")
-            elif any(normalize_name(x["name"]) == normalize_name(new_name) for x in items):
-                st.warning("이미 등록된 재료입니다. 기존 항목을 삭제한 뒤 다시 등록해 주세요.")
-            else:
-                items.append({
-                    "name": new_name.strip(),
-                    "quantity": quantity.strip() or "미입력",
-                    "expiry": expiry.isoformat(),
-                })
-                save_data(items)
-                st.success(f"{new_name.strip()} 등록 완료!")
-                st.rerun()
 
-    st.markdown("<div class='section-title'>내 냉장고 목록</div>", unsafe_allow_html=True)
-    if not items:
-        st.info("아직 등록된 재료가 없습니다. 위에서 재료를 추가해 보세요.")
-    else:
-        today = date.today()
-        for idx, item in enumerate(items):
-            try:
-                exp = date.fromisoformat(item.get("expiry", (today + timedelta(days=7)).isoformat()))
-            except (ValueError, TypeError):
-                exp = today + timedelta(days=7)
-            days_left = (exp - today).days
-            col1, col2, col3, col4 = st.columns([2, 1, 1.5, 1])
-            col1.write(f"**{item['name']}**")
-            col2.write(item.get("quantity", "미입력"))
-            col3.write(f"유통기한: {exp.isoformat()}")
-            if days_left < 0:
-                col3.error(f"{abs(days_left)}일 지남")
-            elif days_left <= 3:
-                col3.warning(f"{days_left}일 남음")
-            else:
-                col3.caption(f"{days_left}일 남음")
-            if col4.button("삭제", key=f"delete_{idx}"):
-                items.pop(idx)
-                save_data(items)
-                st.rerun()
+def generate_custom_recipe(menu_name):
+    """Gemini를 이용해 입력한 메뉴의 구조화된 레시피를 생성합니다."""
+    api_key = get_gemini_api_key()
+    if not api_key:
+        raise RuntimeError("Gemini API 키가 설정되지 않았습니다. Streamlit Secrets에 GEMINI_API_KEY를 등록해 주세요.")
 
-    if items:
-        st.caption("※ 유통기한은 사용자가 입력한 날짜를 기준으로 표시합니다. 실제 섭취 전에는 보관 상태와 식품 상태도 확인하세요.")
+    from google import genai
+    client = genai.Client(api_key=api_key)
+    prompt = f"""
+너는 한국 가정식과 자취 요리에 익숙한 요리 안내자야.
+사용자가 요청한 메뉴: {menu_name}
 
-with tab2:
-    st.markdown("<div class='section-title'>보유 재료로 메뉴 추천</div>", unsafe_allow_html=True)
-    st.caption("등록한 재료를 기준으로 만들 수 있는 메뉴를 자동으로 추천합니다. 재료를 추가하거나 삭제하면 추천도 함께 바뀝니다.")
-    available_items = ingredient_names(items)
-    if not available_items:
-        st.info("먼저 '재료 관리' 탭에서 식재료를 등록해 주세요.")
-    else:
-        scored_recipes = []
-        today = date.today()
-        expiring_names = set()
-        for item in items:
-            try:
-                days_left = (date.fromisoformat(item.get("expiry", "")) - today).days
-                if days_left <= 3:
-                    expiring_names.add(normalize_name(item["name"]))
-            except (ValueError, TypeError):
-                pass
-        for recipe in RECIPES:
-            score, matched, missing = recipe_score(recipe, available_items)
-            if matched:
-                urgent_matches = sum(1 for name in matched if normalize_name(name) in expiring_names)
-                scored_recipes.append((urgent_matches, score, len(matched), recipe, matched, missing))
-        scored_recipes.sort(key=lambda row: (row[0], row[1], row[2]), reverse=True)
-        if not scored_recipes:
-            st.warning("등록한 재료를 활용하는 레시피가 아직 없습니다. 닭가슴살, 파스타면, 참치, 계란, 두부, 김치, 햄, 만두 등 자취생 기본 재료를 등록해 보세요.")
+초보자가 이 설명만 보고 요리할 수 있도록 한국어로 1~2인분 레시피를 작성해.
+식재료와 양념은 가능한 한 g, ml, 개, 큰술(15ml), 작은술(5ml) 단위로 계량해.
+물이나 육수는 반드시 정확한 시작 용량(ml)을 제시하고, 농도 조절 방법도 설명해.
+각 조리 단계마다 불 세기(약불/중불/강불/불 끔), 예상 시간(분), 완료 상태를 구체적으로 적어.
+고기·생선·달걀 등은 안전하게 완전히 익히는 방법을 안내해.
+필요한 양념은 준비 재료와 별도로 숨기지 말고 모두 적어.
+메뉴와 무관한 설명은 하지 말고 JSON 객체만 반환해.
+
+반드시 다음 키를 포함해:
+{{
+  "name": "메뉴 이름",
+  "servings": "1~2인분",
+  "time": 25,
+  "difficulty": "쉬움/보통/어려움 중 하나",
+  "ingredients": [{{"name":"재료명","amount":"150g"}}],
+  "steps": [{{"instruction":"구체적인 조리 설명","heat":"중불","minutes":"3~4분","done":"완료 상태 또는 확인 방법"}}],
+  "tips": ["조리 팁"],
+  "water_note": "물 또는 육수의 양과 조절 방법. 물이 필요 없는 메뉴면 해당 없음이라고 작성"
+}}
+"""
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config={"response_mime_type": "application/json", "temperature": 0.4},
+    )
+    import json as _json
+    result = _json.loads(response.text)
+    required = ["name", "servings", "time", "difficulty", "ingredients", "steps"]
+    if not all(k in result for k in required) or not result["ingredients"] or not result["steps"]:
+        raise ValueError("레시피 응답 형식이 올바르지 않습니다. 메뉴 이름을 조금 바꿔 다시 시도해 주세요.")
+    return result
+
+
+def show_custom_recipe(recipe):
+    st.markdown(f"## 🍽️ {recipe['name']}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("기준 인분", recipe.get("servings", "1~2인분"))
+    c2.metric("예상 조리 시간", f"약 {recipe.get('time', 20)}분")
+    c3.metric("난이도", recipe.get("difficulty", "보통"))
+
+    st.markdown("### 🥕 준비 재료와 정확한 계량")
+    for item in recipe.get("ingredients", []):
+        if isinstance(item, dict):
+            st.write(f"• **{item.get('name', '재료')}**: {item.get('amount', '양 조절')}")
         else:
-            st.success(f"현재 보유 재료 {len(available_items)}개를 확인했어요. 보유 재료를 많이 활용하는 메뉴부터 보여드릴게요.")
-            for urgent_matches, score, matched_count, recipe, matched, missing in scored_recipes[:15]:
-                with st.container(border=True):
-                    left, right = st.columns([4, 1])
-                    with left:
-                        st.markdown(f"### 🍽️ {recipe['name']}")
-                        st.write(f"재료 일치율 **{round(score * 100)}%** · 조리 시간 약 {recipe['time']}분 · 난이도 {recipe['difficulty']}")
-                        st.write("**보유 재료 중 사용 가능:** " + ", ".join(matched))
-                        urgent_used = [name for name in matched if normalize_name(name) in expiring_names]
-                        if urgent_used:
-                            st.warning("유통기한이 임박한 재료 포함: " + ", ".join(urgent_used))
-                        extras = missing + recipe.get("extra", [])
-                        st.write("**추가로 필요한 재료:** " + (", ".join(extras) if extras else "없음"))
-                    with right:
-                        st.metric("재료 일치율", f"{round(score * 100)}%")
-                    with st.expander("상세 레시피 보기", expanded=False):
-                        st.markdown(f"**준비 재료:** {', '.join(recipe['ingredients'])}")
-                        if recipe.get("extra"):
-                            st.markdown(f"**추가 재료·선택 양념:** {', '.join(recipe['extra'])}")
-                        st.markdown("**조리 순서**")
-                        for step_no, step in enumerate(recipe["steps"], 1):
-                            heat, duration, tip = cooking_guide(recipe, step, step_no - 1)
-                            st.markdown(f"**{step_no}단계. {step}**")
-                            info1, info2 = st.columns(2)
-                            info1.caption(f"🔥 불 세기: {heat}")
-                            info2.caption(f"⏱️ 예상 시간: {duration}")
-                            st.caption(f"조리 팁: {tip}")
-                        st.info("조리 시간과 불 세기는 가정용 화력과 재료의 양·두께에 따라 달라질 수 있습니다. 특히 고기와 닭고기는 속까지 완전히 익었는지 확인하세요.")
+            st.write(f"• {item}")
 
+    water_note = recipe.get("water_note", "")
+    if water_note:
+        st.info("💧 물·육수 안내: " + str(water_note))
+
+    st.markdown("### 👩‍🍳 단계별 조리 순서")
+    for i, step in enumerate(recipe.get("steps", []), 1):
+        if isinstance(step, dict):
+            st.markdown(f"**{i}단계. {step.get('instruction', '')}**")
+            a, b = st.columns(2)
+            a.caption(f"🔥 불 세기: {step.get('heat', '중불')}")
+            b.caption(f"⏱️ 예상 시간: {step.get('minutes', '상태 확인')}")
+            if step.get("done"):
+                st.caption("✔ 완료 기준: " + str(step["done"]))
+        else:
+            st.markdown(f"**{i}단계. {step}**")
+
+    if recipe.get("tips"):
+        st.markdown("### 💡 요리 팁")
+        for tip in recipe["tips"]:
+            st.write("• " + str(tip))
+    st.warning("AI가 생성한 레시피는 참고용입니다. 재료의 신선도와 제품별 염도, 화력에 따라 간과 조리 시간을 조절하고 고기·생선·달걀은 속까지 충분히 익혀 주세요.")
+
+
+# 첫 화면과 두 가지 기능을 세션 상태로 전환합니다.
+if "app_page" not in st.session_state:
+    st.session_state.app_page = "home"
+
+if st.session_state.app_page == "home":
+    st.markdown("<div class='section-title'>원하는 서비스를 선택해 주세요</div>", unsafe_allow_html=True)
+    st.caption("이용할 기능을 선택해 주세요.")
+    st.write("")
+    # 첫 화면에 두 개의 큰 선택 버튼을 좌우로 나란히 배치합니다.
+    left, right = st.columns(2, gap="large")
+    with left:
+        st.markdown(
+            """
+            <div style="border:1px solid #d9e2d8; border-radius:18px; padding:28px 18px 18px;
+                        min-height:190px; text-align:center; background:#f7faf5;">
+                <div style="font-size:42px; margin-bottom:12px;">🥬</div>
+                <div style="font-size:21px; font-weight:700; color:#244b35;">재료 관리 / 메뉴 추천</div>
+                <div style="font-size:14px; color:#64746a; margin-top:10px; line-height:1.6;">
+                    냉장고 재료와 유통기한을 관리하고<br>보유한 재료로 만들 수 있는 메뉴 찾기
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("재료 관리 / 메뉴 추천", key="home_fridge_button",
+                     use_container_width=True, type="primary"):
+            st.session_state.app_page = "fridge"
+            st.rerun()
+    with right:
+        st.markdown(
+            """
+            <div style="border:1px solid #d9e2d8; border-radius:18px; padding:28px 18px 18px;
+                        min-height:190px; text-align:center; background:#f7faf5;">
+                <div style="font-size:42px; margin-bottom:12px;">🍳</div>
+                <div style="font-size:21px; font-weight:700; color:#244b35;">원하는 메뉴 레시피</div>
+                <div style="font-size:14px; color:#64746a; margin-top:10px; line-height:1.6;">
+                    먹고 싶은 메뉴 이름을 입력하고<br>AI가 만드는 상세 레시피 확인하기
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("원하는 메뉴 레시피", key="home_custom_recipe_button",
+                     use_container_width=True, type="primary"):
+            st.session_state.app_page = "custom_recipe"
+            st.rerun()
+
+elif st.session_state.app_page == "custom_recipe":
+    if st.button("← 첫 화면으로", key="back_from_recipe"):
+        st.session_state.app_page = "home"
+        st.rerun()
+    st.markdown("<div class='section-title'>원하는 메뉴 레시피</div>", unsafe_allow_html=True)
+    st.caption("먹고 싶은 메뉴를 입력하면 1~2인분 기준의 상세 레시피를 만들어 드립니다.")
+    with st.form("custom_recipe_form"):
+        menu_name = st.text_input("만들고 싶은 메뉴", placeholder="예: 제육볶음, 크림파스타, 김치찌개")
+        submitted_recipe = st.form_submit_button("레시피 만들기", type="primary", use_container_width=True)
+    if submitted_recipe:
+        if not menu_name.strip():
+            st.warning("메뉴 이름을 먼저 입력해 주세요.")
+        else:
+            with st.spinner(f"'{menu_name.strip()}' 레시피를 만들고 있어요..."):
+                try:
+                    st.session_state.generated_recipe = generate_custom_recipe(menu_name.strip())
+                    st.session_state.generated_recipe_query = menu_name.strip()
+                except Exception as exc:
+                    error_text = str(exc)
+                    if "API 키가 설정" in error_text:
+                        st.error(error_text)
+                    else:
+                        st.error("레시피를 생성하지 못했어요. API 키, 인터넷 연결 또는 Gemini 사용량을 확인한 뒤 다시 시도해 주세요.")
+                        st.caption(f"오류 내용: {error_text[:500]}")
+    if st.session_state.get("generated_recipe"):
+        st.divider()
+        show_custom_recipe(st.session_state.generated_recipe)
+
+elif st.session_state.app_page == "fridge":
+    if st.button("← 첫 화면으로", key="back_from_fridge"):
+        st.session_state.app_page = "home"
+        st.rerun()
+
+    items = load_data()
+    tab1, tab2 = st.tabs(["식재료 관리", "메뉴 추천"])
+
+    with tab1:
+        st.markdown("<div class='section-title'>식재료 관리</div>", unsafe_allow_html=True)
+        st.caption("보유한 재료와 유통기한을 한눈에 관리해요.")
+        with st.form("add_ingredient", clear_on_submit=True):
+            c1, c2, c3 = st.columns([2, 1, 1])
+            with c1:
+                new_name = st.text_input("식재료 이름", placeholder="예: 계란")
+            with c2:
+                quantity = st.text_input("수량", placeholder="예: 3개")
+            with c3:
+                expiry = st.date_input("유통기한", value=date.today() + timedelta(days=7))
+            submitted = st.form_submit_button("재료 추가")
+            if submitted:
+                if not new_name.strip():
+                    st.warning("식재료 이름을 입력해 주세요.")
+                elif any(normalize_name(x["name"]) == normalize_name(new_name) for x in items):
+                    st.warning("이미 등록된 재료입니다. 기존 항목을 삭제한 뒤 다시 등록해 주세요.")
+                else:
+                    items.append({"name": new_name.strip(), "quantity": quantity.strip() or "미입력", "expiry": expiry.isoformat()})
+                    save_data(items)
+                    st.success(f"{new_name.strip()} 등록 완료!")
+                    st.rerun()
+
+        st.markdown("<div class='section-title'>내 냉장고 목록</div>", unsafe_allow_html=True)
+        if not items:
+            st.info("아직 등록된 재료가 없습니다. 위에서 재료를 추가해 보세요.")
+        else:
+            today = date.today()
+            for idx, item in enumerate(items):
+                try:
+                    exp = date.fromisoformat(item.get("expiry", (today + timedelta(days=7)).isoformat()))
+                except (ValueError, TypeError):
+                    exp = today + timedelta(days=7)
+                days_left = (exp - today).days
+                col1, col2, col3, col4 = st.columns([2, 1, 1.5, 1])
+                col1.write(f"**{item['name']}**")
+                col2.write(item.get("quantity", "미입력"))
+                col3.write(f"유통기한: {exp.isoformat()}")
+                if days_left < 0:
+                    col3.error(f"{abs(days_left)}일 지남")
+                elif days_left <= 3:
+                    col3.warning(f"{days_left}일 남음")
+                else:
+                    col3.caption(f"{days_left}일 남음")
+                if col4.button("삭제", key=f"delete_{idx}"):
+                    items.pop(idx)
+                    save_data(items)
+                    st.rerun()
+            st.caption("※ 유통기한은 사용자가 입력한 날짜를 기준으로 표시합니다. 실제 섭취 전에는 보관 상태와 식품 상태도 확인하세요.")
+
+    with tab2:
+        st.markdown("<div class='section-title'>보유 재료로 메뉴 추천</div>", unsafe_allow_html=True)
+        st.caption("등록한 재료를 기준으로 만들 수 있는 메뉴를 자동으로 추천합니다. 재료를 추가하거나 삭제하면 추천도 함께 바뀝니다.")
+        available_items = ingredient_names(items)
+        if not available_items:
+            st.info("먼저 '재료 관리' 탭에서 식재료를 등록해 주세요.")
+        else:
+            scored_recipes = []
+            today = date.today()
+            expiring_names = set()
+            for item in items:
+                try:
+                    days_left = (date.fromisoformat(item.get("expiry", "")) - today).days
+                    if days_left <= 3:
+                        expiring_names.add(normalize_name(item["name"]))
+                except (ValueError, TypeError):
+                    pass
+            for recipe in RECIPES:
+                score, matched, missing = recipe_score(recipe, available_items)
+                if matched:
+                    urgent_matches = sum(1 for name in matched if normalize_name(name) in expiring_names)
+                    scored_recipes.append((urgent_matches, score, len(matched), recipe, matched, missing))
+            scored_recipes.sort(key=lambda row: (row[0], row[1], row[2]), reverse=True)
+            if not scored_recipes:
+                st.warning("등록한 재료를 활용하는 레시피가 아직 없습니다. 닭가슴살, 파스타면, 참치, 계란, 두부, 김치, 햄, 만두 등 자취생 기본 재료를 등록해 보세요.")
+            else:
+                st.success(f"현재 보유 재료 {len(available_items)}개를 확인했어요. 보유 재료를 많이 활용하는 메뉴부터 보여드릴게요.")
+                for urgent_matches, score, matched_count, recipe, matched, missing in scored_recipes[:15]:
+                    with st.container(border=True):
+                        left, right = st.columns([4, 1])
+                        with left:
+                            st.markdown(f"### 🍽️ {recipe['name']}")
+                            st.write(f"재료 일치율 **{round(score * 100)}%** · 조리 시간 약 {recipe['time']}분 · 난이도 {recipe['difficulty']}")
+                            st.write("**보유 재료 중 사용 가능:** " + ", ".join(matched))
+                            urgent_used = [name for name in matched if normalize_name(name) in expiring_names]
+                            if urgent_used:
+                                st.warning("유통기한이 임박한 재료 포함: " + ", ".join(urgent_used))
+                            extras = missing + recipe.get("extra", [])
+                            st.write("**추가로 필요한 재료:** " + (", ".join(extras) if extras else "없음"))
+                        with right:
+                            st.metric("재료 일치율", f"{round(score * 100)}%")
+                        with st.expander("상세 레시피 보기", expanded=False):
+                            st.markdown("**준비 재료 (1~2인분 기준)**")
+                            for ingredient in recipe["ingredients"]:
+                                st.write(f"• {ingredient}: **{ingredient_amount(ingredient, recipe['name'])}**")
+                            if recipe.get("extra"):
+                                st.markdown("**추가 재료·양념**")
+                                for extra in recipe["extra"]:
+                                    st.write(f"• {extra}: **{extra_amount(extra, recipe['name'])}**")
+                            water_note = recipe_water_note(recipe)
+                            if water_note:
+                                st.info("💧 물 조절 팁: " + water_note)
+                            st.markdown("**조리 순서**")
+                            for step_no, step in enumerate(recipe["steps"], 1):
+                                heat, duration, tip = cooking_guide(recipe, step, step_no - 1)
+                                st.markdown(f"**{step_no}단계. {step}**")
+                                info1, info2 = st.columns(2)
+                                info1.caption(f"🔥 불 세기: {heat}")
+                                info2.caption(f"⏱️ 예상 시간: {duration}")
+                                st.caption(f"조리 팁: {tip}")
+                            st.info("계량은 1~2인분 기준의 가정용 조리 예시입니다. 재료 크기·제품 염도·화력에 따라 달라질 수 있으니 간은 조금씩 조절하세요. 고기와 닭고기는 속까지 완전히 익혀 드세요.")
 
 st.divider()
 st.caption("오늘의 냉장고 · 식재료를 알뜰하게 활용하는 나만의 주방 도우미")
