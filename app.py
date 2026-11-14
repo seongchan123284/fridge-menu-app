@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -588,13 +589,14 @@ def get_gemini_api_key():
 
 
 def generate_custom_recipe(menu_name):
-    """Gemini를 이용해 입력한 메뉴의 구조화된 레시피를 생성합니다."""
+    """Gemini 레시피 생성: 일시 오류 재시도, 대체 모델 전환."""
     api_key = get_gemini_api_key()
     if not api_key:
         raise RuntimeError("Gemini API 키가 설정되지 않았습니다. Streamlit Secrets에 GEMINI_API_KEY를 등록해 주세요.")
 
     from google import genai
     client = genai.Client(api_key=api_key)
+
     prompt = f"""
 너는 한국 가정식과 자취 요리에 익숙한 요리 안내자야.
 사용자가 요청한 메뉴: {menu_name}
@@ -619,17 +621,46 @@ def generate_custom_recipe(menu_name):
   "water_note": "물 또는 육수의 양과 조절 방법. 물이 필요 없는 메뉴면 해당 없음이라고 작성"
 }}
 """
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt,
-        config={"response_mime_type": "application/json", "temperature": 0.4},
+
+    # 먼저 현재 사용 모델을 시도하고, 일시 장애나 모델 오류 시 대체 모델을 사용합니다.
+    models = ["gemini-3.8-flash", "gemini-2.5-flash"]
+    transient_markers = [
+        "503", "UNAVAILABLE", "high demand", "overloaded",
+        "429", "RESOURCE_EXHAUSTED", "rate limit",
+        "500", "502", "504", "INTERNAL", "DEADLINE_EXCEEDED",
+    ]
+    last_error = None
+
+    for model_name in models:
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config={"response_mime_type": "application/json", "temperature": 0.4},
+                )
+                result = json.loads(response.text)
+                required = ["name", "servings", "time", "difficulty", "ingredients", "steps"]
+                if not all(k in result for k in required) or not result["ingredients"] or not result["steps"]:
+                    raise ValueError("레시피 응답 형식이 올바르지 않습니다. 메뉴 이름을 조금 바꿔 다시 시도해 주세요.")
+                return result
+            except Exception as exc:
+                last_error = exc
+                error_text = str(exc).upper()
+                is_transient = any(marker.upper() in error_text for marker in transient_markers)
+                if is_transient and attempt < 2:
+                    # 2초, 4초 간격으로 재시도
+                    time.sleep(2 ** (attempt + 1))
+                    continue
+                # 모델 사용 불가/과부하가 계속되면 다음 모델로 전환
+                if is_transient or "NOT_FOUND" in error_text or "404" in error_text:
+                    break
+                raise
+
+    raise RuntimeError(
+        "Gemini 기본 모델과 대체 모델 모두 응답하지 않았습니다. "
+        "잠시 후 다시 시도해 주세요. 마지막 오류: " + str(last_error)
     )
-    import json as _json
-    result = _json.loads(response.text)
-    required = ["name", "servings", "time", "difficulty", "ingredients", "steps"]
-    if not all(k in result for k in required) or not result["ingredients"] or not result["steps"]:
-        raise ValueError("레시피 응답 형식이 올바르지 않습니다. 메뉴 이름을 조금 바꿔 다시 시도해 주세요.")
-    return result
 
 
 def show_custom_recipe(recipe):
@@ -731,8 +762,17 @@ elif st.session_state.app_page == "custom_recipe":
         else:
             with st.spinner(f"'{menu_name.strip()}' 레시피를 만들고 있어요..."):
                 try:
-                    st.session_state.generated_recipe = generate_custom_recipe(menu_name.strip())
-                    st.session_state.generated_recipe_query = menu_name.strip()
+                    normalized_menu = " ".join(menu_name.strip().split()).casefold()
+                    if "recipe_cache" not in st.session_state:
+                        st.session_state.recipe_cache = {}
+                    if normalized_menu in st.session_state.recipe_cache:
+                        st.session_state.generated_recipe = st.session_state.recipe_cache[normalized_menu]
+                        st.session_state.generated_recipe_query = menu_name.strip()
+                        st.success("저장된 레시피를 불러왔어요. Gemini API를 다시 호출하지 않았습니다.")
+                    else:
+                        st.session_state.generated_recipe = generate_custom_recipe(menu_name.strip())
+                        st.session_state.generated_recipe_query = menu_name.strip()
+                        st.session_state.recipe_cache[normalized_menu] = st.session_state.generated_recipe
                 except Exception as exc:
                     error_text = str(exc)
                     if "API 키가 설정" in error_text:
