@@ -678,15 +678,10 @@ if st.session_state.app_page == "home":
     st.caption("이용할 기능을 선택해 주세요.")
     st.write("")
 
-    # 카드 전체가 클릭 가능한 버튼이며, 제목과 설명은 줄바꿈해 표시합니다.
+    # HTML 줄바꿈 태그를 사용해 카드 안의 아이콘/제목/설명을 세로로 배치합니다.
     left, right = st.columns(2, gap="large")
     with left:
-        fridge_card_label = """🥬
-
-**재료 관리 / 메뉴 추천**
-
-냉장고 재료와 유통기한을 관리하고
-보유한 재료로 만들 수 있는 메뉴 찾기"""
+        fridge_card_label = "🥬<br><br>**재료 관리 / 메뉴 추천**<br><br>냉장고 재료와 유통기한을 관리하고<br>보유한 재료로 만들 수 있는 메뉴 찾기"
         if st.button(
             fridge_card_label,
             key="home_fridge_card",
@@ -697,12 +692,7 @@ if st.session_state.app_page == "home":
             st.rerun()
 
     with right:
-        recipe_card_label = """🍳
-
-**원하는 메뉴 레시피**
-
-먹고 싶은 메뉴 이름을 입력하고
-AI가 만드는 상세 레시피 확인하기"""
+        recipe_card_label = "🍳<br><br>**원하는 메뉴 레시피**<br><br>먹고 싶은 메뉴 이름을 입력하고<br>AI가 만드는 상세 레시피 확인하기"
         if st.button(
             recipe_card_label,
             key="home_custom_recipe_card",
@@ -718,7 +708,7 @@ AI가 만드는 상세 레시피 확인하기"""
         div[data-testid="stButton"] > button {
             width: 100%;
             min-height: 245px;
-            white-space: pre-wrap;
+            white-space: normal;
             text-align: center;
             justify-content: center;
             align-items: center;
@@ -735,8 +725,13 @@ AI가 만드는 상세 레시피 확인하기"""
             transition: background 0.15s ease, border-color 0.15s ease;
         }
         div[data-testid="stButton"] > button p {
-            margin: 0.25rem 0;
+            margin: 0;
             text-align: center;
+            width: 100%;
+        }
+        div[data-testid="stButton"] > button strong {
+            font-size: 21px;
+            font-weight: 700;
         }
         div[data-testid="stButton"] > button:hover {
             border-color: #39734f;
