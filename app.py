@@ -677,76 +677,44 @@ if st.session_state.app_page == "home":
     st.markdown("<div class='section-title'>원하는 서비스를 선택해 주세요</div>", unsafe_allow_html=True)
     st.caption("이용할 기능을 선택해 주세요.")
     st.write("")
-
-    # HTML 줄바꿈 태그를 사용해 카드 안의 아이콘/제목/설명을 세로로 배치합니다.
+    # 첫 화면에 두 개의 큰 선택 버튼을 좌우로 나란히 배치합니다.
     left, right = st.columns(2, gap="large")
     with left:
-        fridge_card_label = "🥬<br><br>**재료 관리 / 메뉴 추천**<br><br>냉장고 재료와 유통기한을 관리하고<br>보유한 재료로 만들 수 있는 메뉴 찾기"
-        if st.button(
-            fridge_card_label,
-            key="home_fridge_card",
-            use_container_width=True,
-            type="secondary",
-        ):
+        st.markdown(
+            """
+            <div style="border:1px solid #d9e2d8; border-radius:18px; padding:28px 18px 18px;
+                        min-height:190px; text-align:center; background:#f7faf5;">
+                <div style="font-size:42px; margin-bottom:12px;">🥬</div>
+                <div style="font-size:21px; font-weight:700; color:#244b35;">재료 관리 / 메뉴 추천</div>
+                <div style="font-size:14px; color:#64746a; margin-top:10px; line-height:1.6;">
+                    냉장고 재료와 유통기한을 관리하고<br>보유한 재료로 만들 수 있는 메뉴 찾기
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("재료 관리 / 메뉴 추천", key="home_fridge_button",
+                     use_container_width=True, type="primary"):
             st.session_state.app_page = "fridge"
             st.rerun()
-
     with right:
-        recipe_card_label = "🍳<br><br>**원하는 메뉴 레시피**<br><br>먹고 싶은 메뉴 이름을 입력하고<br>AI가 만드는 상세 레시피 확인하기"
-        if st.button(
-            recipe_card_label,
-            key="home_custom_recipe_card",
-            use_container_width=True,
-            type="secondary",
-        ):
+        st.markdown(
+            """
+            <div style="border:1px solid #d9e2d8; border-radius:18px; padding:28px 18px 18px;
+                        min-height:190px; text-align:center; background:#f7faf5;">
+                <div style="font-size:42px; margin-bottom:12px;">🍳</div>
+                <div style="font-size:21px; font-weight:700; color:#244b35;">원하는 메뉴 레시피</div>
+                <div style="font-size:14px; color:#64746a; margin-top:10px; line-height:1.6;">
+                    먹고 싶은 메뉴 이름을 입력하고<br>AI가 만드는 상세 레시피 확인하기
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("원하는 메뉴 레시피", key="home_custom_recipe_button",
+                     use_container_width=True, type="primary"):
             st.session_state.app_page = "custom_recipe"
             st.rerun()
-
-    st.markdown(
-        """
-        <style>
-        div[data-testid="stButton"] > button {
-            width: 100%;
-            min-height: 245px;
-            white-space: normal;
-            text-align: center;
-            justify-content: center;
-            align-items: center;
-            display: flex;
-            border: 1px solid #d9e2d8;
-            border-radius: 24px;
-            background: #f7faf5;
-            color: #244b35;
-            padding: 30px 24px;
-            font-size: 17px;
-            font-weight: 400;
-            line-height: 1.8;
-            box-shadow: none;
-            transition: background 0.15s ease, border-color 0.15s ease;
-        }
-        div[data-testid="stButton"] > button p {
-            margin: 0;
-            text-align: center;
-            width: 100%;
-        }
-        div[data-testid="stButton"] > button strong {
-            font-size: 21px;
-            font-weight: 700;
-        }
-        div[data-testid="stButton"] > button:hover {
-            border-color: #39734f;
-            background: #edf5ec;
-            color: #183d29;
-        }
-        div[data-testid="stButton"] > button:focus:not(:active) {
-            border-color: #39734f;
-            color: #183d29;
-            box-shadow: 0 0 0 1px #39734f;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 elif st.session_state.app_page == "custom_recipe":
     if st.button("← 첫 화면으로", key="back_from_recipe"):
