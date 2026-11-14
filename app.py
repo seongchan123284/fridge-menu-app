@@ -589,7 +589,7 @@ def get_gemini_api_key():
 
 
 def generate_custom_recipe(menu_name):
-    """Gemini 레시피 생성: 일시 오류 재시도, 대체 모델 전환."""
+    """빠른 Gemini 레시피 생성: 경량 모델 우선, 짧은 재시도, 대체 모델."""
     api_key = get_gemini_api_key()
     if not api_key:
         raise RuntimeError("Gemini API 키가 설정되지 않았습니다. Streamlit Secrets에 GEMINI_API_KEY를 등록해 주세요.")
@@ -597,47 +597,48 @@ def generate_custom_recipe(menu_name):
     from google import genai
     client = genai.Client(api_key=api_key)
 
+    # 답변 형식을 간결하게 제한해 생성 시간을 줄이되, 계량과 조리 정보는 유지합니다.
     prompt = f"""
-너는 한국 가정식과 자취 요리에 익숙한 요리 안내자야.
-사용자가 요청한 메뉴: {menu_name}
-
-초보자가 이 설명만 보고 요리할 수 있도록 한국어로 1~2인분 레시피를 작성해.
-식재료와 양념은 가능한 한 g, ml, 개, 큰술(15ml), 작은술(5ml) 단위로 계량해.
-물이나 육수는 반드시 정확한 시작 용량(ml)을 제시하고, 농도 조절 방법도 설명해.
-각 조리 단계마다 불 세기(약불/중불/강불/불 끔), 예상 시간(분), 완료 상태를 구체적으로 적어.
-고기·생선·달걀 등은 안전하게 완전히 익히는 방법을 안내해.
-필요한 양념은 준비 재료와 별도로 숨기지 말고 모두 적어.
-메뉴와 무관한 설명은 하지 말고 JSON 객체만 반환해.
-
-반드시 다음 키를 포함해:
+한국어 요리 안내자 역할을 해. 메뉴: {menu_name}
+초보자가 그대로 따라 할 수 있는 1~2인분 레시피를 작성해.
+재료와 양념은 g/ml/개/큰술(15ml)/작은술(5ml)로 정확히 계량해.
+국물 요리는 물·육수 시작량을 ml로 반드시 표시해.
+각 단계에는 불 세기, 시간, 완료 상태를 넣어. 고기·생선·달걀은 충분히 익히는 기준을 적어.
+불필요한 서론 없이 아래 JSON만 반환해. 단계는 핵심 5~7개, 팁은 최대 3개로 간결하게 작성해.
 {{
-  "name": "메뉴 이름",
-  "servings": "1~2인분",
-  "time": 25,
-  "difficulty": "쉬움/보통/어려움 중 하나",
-  "ingredients": [{{"name":"재료명","amount":"150g"}}],
-  "steps": [{{"instruction":"구체적인 조리 설명","heat":"중불","minutes":"3~4분","done":"완료 상태 또는 확인 방법"}}],
-  "tips": ["조리 팁"],
-  "water_note": "물 또는 육수의 양과 조절 방법. 물이 필요 없는 메뉴면 해당 없음이라고 작성"
+ "name":"메뉴명",
+ "servings":"1~2인분",
+ "time":25,
+ "difficulty":"쉬움/보통/어려움",
+ "ingredients":[{{"name":"재료명","amount":"150g"}}],
+ "steps":[{{"instruction":"조리 설명","heat":"중불","minutes":"3분","done":"익은 상태 확인법"}}],
+ "tips":["팁"],
+ "water_note":"물 또는 육수의 정확한 양(ml), 또는 필요 없음"
 }}
 """
 
-    # 먼저 현재 사용 모델을 시도하고, 일시 장애나 모델 오류 시 대체 모델을 사용합니다.
-    models = ["gemini-3.8-flash", "gemini-2.5-flash"]
+    # Flash-Lite는 빠른 응답·일반적인 작업에 적합합니다.
+    # 503/429 등 일시 오류 시 짧게 한 번 재시도하고, 이후 Flash 모델로 전환합니다.
+    models = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
     transient_markers = [
-        "503", "UNAVAILABLE", "high demand", "overloaded",
-        "429", "RESOURCE_EXHAUSTED", "rate limit",
+        "503", "UNAVAILABLE", "HIGH DEMAND", "OVERLOADED",
+        "429", "RESOURCE_EXHAUSTED", "RATE LIMIT",
         "500", "502", "504", "INTERNAL", "DEADLINE_EXCEEDED",
     ]
     last_error = None
 
-    for model_name in models:
-        for attempt in range(3):
+    for model_index, model_name in enumerate(models):
+        attempts = 2 if model_index == 0 else 1
+        for attempt in range(attempts):
             try:
                 response = client.models.generate_content(
                     model=model_name,
                     contents=prompt,
-                    config={"response_mime_type": "application/json", "temperature": 0.4},
+                    config={
+                        "response_mime_type": "application/json",
+                        "temperature": 0.3,
+                        "max_output_tokens": 1800,
+                    },
                 )
                 result = json.loads(response.text)
                 required = ["name", "servings", "time", "difficulty", "ingredients", "steps"]
@@ -647,19 +648,18 @@ def generate_custom_recipe(menu_name):
             except Exception as exc:
                 last_error = exc
                 error_text = str(exc).upper()
-                is_transient = any(marker.upper() in error_text for marker in transient_markers)
-                if is_transient and attempt < 2:
-                    # 2초, 4초 간격으로 재시도
-                    time.sleep(2 ** (attempt + 1))
+                is_transient = any(marker in error_text for marker in transient_markers)
+                model_unavailable = "NOT_FOUND" in error_text or "404" in error_text
+                if is_transient and attempt == 0:
+                    time.sleep(1)
                     continue
-                # 모델 사용 불가/과부하가 계속되면 다음 모델로 전환
-                if is_transient or "NOT_FOUND" in error_text or "404" in error_text:
+                if is_transient or model_unavailable:
                     break
                 raise
 
     raise RuntimeError(
-        "Gemini 기본 모델과 대체 모델 모두 응답하지 않았습니다. "
-        "잠시 후 다시 시도해 주세요. 마지막 오류: " + str(last_error)
+        "빠른 모델과 대체 모델 모두 응답하지 않았습니다. 잠시 후 다시 시도해 주세요. "
+        "마지막 오류: " + str(last_error)
     )
 
 
