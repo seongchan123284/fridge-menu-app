@@ -678,20 +678,33 @@ if st.session_state.app_page == "home":
     st.caption("이용할 기능을 선택해 주세요.")
     st.write("")
 
-    # 카드 전체가 클릭 가능한 버튼입니다.
+    # 카드 전체가 클릭 가능한 버튼이며, 제목과 설명은 줄바꿈해 표시합니다.
     left, right = st.columns(2, gap="large")
     with left:
+        fridge_card_label = """🥬
+
+**재료 관리 / 메뉴 추천**
+
+냉장고 재료와 유통기한을 관리하고
+보유한 재료로 만들 수 있는 메뉴 찾기"""
         if st.button(
-            "🥬\\n\\n재료 관리 / 메뉴 추천\\n\\n냉장고 재료와 유통기한을 관리하고\\n보유한 재료로 만들 수 있는 메뉴 찾기",
+            fridge_card_label,
             key="home_fridge_card",
             use_container_width=True,
             type="secondary",
         ):
             st.session_state.app_page = "fridge"
             st.rerun()
+
     with right:
+        recipe_card_label = """🍳
+
+**원하는 메뉴 레시피**
+
+먹고 싶은 메뉴 이름을 입력하고
+AI가 만드는 상세 레시피 확인하기"""
         if st.button(
-            "🍳\\n\\n원하는 메뉴 레시피\\n\\n먹고 싶은 메뉴 이름을 입력하고\\nAI가 만드는 상세 레시피 확인하기",
+            recipe_card_label,
             key="home_custom_recipe_card",
             use_container_width=True,
             type="secondary",
@@ -708,22 +721,32 @@ if st.session_state.app_page == "home":
             white-space: pre-wrap;
             text-align: center;
             justify-content: center;
+            align-items: center;
             display: flex;
-            flex-direction: column;
             border: 1px solid #d9e2d8;
-            border-radius: 18px;
+            border-radius: 24px;
             background: #f7faf5;
             color: #244b35;
-            padding: 28px 18px;
-            font-size: 18px;
-            font-weight: 600;
+            padding: 30px 24px;
+            font-size: 17px;
+            font-weight: 400;
             line-height: 1.8;
-            transition: all 0.15s ease-in-out;
+            box-shadow: none;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        div[data-testid="stButton"] > button p {
+            margin: 0.25rem 0;
+            text-align: center;
         }
         div[data-testid="stButton"] > button:hover {
             border-color: #39734f;
             background: #edf5ec;
             color: #183d29;
+        }
+        div[data-testid="stButton"] > button:focus:not(:active) {
+            border-color: #39734f;
+            color: #183d29;
+            box-shadow: 0 0 0 1px #39734f;
         }
         </style>
         """,
